@@ -251,7 +251,11 @@ Re-running `install.sh` updates the skill, commands, and hook while **preserving
 
 **Quick:**
 ```bash
+# Linux / macOS / Git Bash
 bash uninstall.sh
+
+# Windows (CMD / PowerShell)
+uninstall.bat
 ```
 
 **Manual — Important: Remove the hook from settings.json FIRST, before deleting files.** Otherwise the hook will fire on every Bash command and produce blocking errors because the script no longer exists.
