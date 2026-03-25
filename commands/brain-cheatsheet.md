@@ -1,0 +1,1 @@
+Generate a condensed cheat sheet from the Brainless knowledge base at `~/.claude/brainless/`. Usage: `/brain-cheatsheet [category]` where category is one of: build, runtime, config, network, dependency, permission, logic, ctf, reversing, exploit, tricks, tools, all. Save to `~/.claude/brainless/_cheatsheets/[category].md`.

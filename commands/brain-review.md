@@ -1,0 +1,1 @@
+Start a spaced repetition review session using entries from the Brainless knowledge base at `~/.claude/brainless/`. Select entries that are old with low hit_count, unsolved CTF challenges, or high-value tricks. Present quiz-style: show the problem first, ask if I remember, then reveal the solution.

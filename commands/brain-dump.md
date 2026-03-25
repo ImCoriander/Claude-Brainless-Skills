@@ -1,0 +1,3 @@
+Record the current error, CTF solution, reversing finding, exploit technique, trick, or tool usage to the Brainless knowledge base at `~/.claude/brainless/`. Use the appropriate template from the brainless skill. Follow the full recording workflow: classify → check duplicates → write file → update _cache.json → update sub-index → update INDEX.md → confirm.
+
+IMPORTANT: This command should be invoked AUTOMATICALLY (not just manually) — immediately after resolving any non-trivial error, without waiting for the user to ask. If you just fixed a non-zero exit code, environment issue, build failure, or any unexpected problem, call /brain-dump NOW before moving on.

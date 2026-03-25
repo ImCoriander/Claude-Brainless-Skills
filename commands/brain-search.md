@@ -1,0 +1,1 @@
+Search the Brainless knowledge base at `~/.claude/brainless/` using the 3-Level strategy: (1) Read `_cache.json` for fast metadata search, (2) Read relevant `<category>/_index.md` if needed, (3) Read full entry only on confirmed match. Present the solution and update hit_count. If no match found, say so.

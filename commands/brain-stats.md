@@ -1,0 +1,1 @@
+Show comprehensive statistics of the Brainless knowledge base at `~/.claude/brainless/`. Include: total entries by type, breakdown by category, top 10 most recalled entries, recently added, weakness analysis (CTF fails, recurring errors, troublesome architectures), and strength areas.
