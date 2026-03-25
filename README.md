@@ -249,15 +249,47 @@ Re-running `install.sh` updates the skill, commands, and hook while **preserving
 
 ## Uninstall
 
-Remove the installed files:
+**Quick:**
 ```bash
+bash uninstall.sh
+```
+
+**Manual — Important: Remove the hook from settings.json FIRST, before deleting files.** Otherwise the hook will fire on every Bash command and produce blocking errors because the script no longer exists.
+
+```bash
+# Step 1: Remove hook from settings.json (use Python helper)
+python3 -c "
+import json
+f = open('$HOME/.claude/settings.json', 'r'); s = json.load(f); f.close()
+hooks = s.get('hooks', {}).get('PostToolUse', [])
+s['hooks']['PostToolUse'] = [h for h in hooks if h.get('matcher') != 'Bash' or not any('bash_error_search' in hk.get('command', '') for hk in h.get('hooks', []))]
+f = open('$HOME/.claude/settings.json', 'w'); json.dump(s, f, indent=2, ensure_ascii=False); f.close()
+" 2>/dev/null || python -c "
+import json
+f = open('$HOME/.claude/settings.json', 'r'); s = json.load(f); f.close()
+hooks = s.get('hooks', {}).get('PostToolUse', [])
+s['hooks']['PostToolUse'] = [h for h in hooks if h.get('matcher') != 'Bash' or not any('bash_error_search' in hk.get('command', '') for hk in h.get('hooks', []))]
+f = open('$HOME/.claude/settings.json', 'w'); json.dump(s, f, indent=2, ensure_ascii=False); f.close()
+"
+
+# Step 2: Remove the Brainless section from CLAUDE.md
+python3 -c "
+import re
+f = open('$HOME/.claude/CLAUDE.md', 'r'); c = f.read(); f.close()
+c = re.sub(r'\n*## Brainless Auto-Behaviors \(MANDATORY\).*?(?=\n## (?!Brainless)|$)', '', c, flags=re.DOTALL).strip()
+f = open('$HOME/.claude/CLAUDE.md', 'w'); f.write(c + '\n'); f.close()
+" 2>/dev/null || python -c "
+import re
+f = open('$HOME/.claude/CLAUDE.md', 'r'); c = f.read(); f.close()
+c = re.sub(r'\n*## Brainless Auto-Behaviors \(MANDATORY\).*?(?=\n## (?!Brainless)|$)', '', c, flags=re.DOTALL).strip()
+f = open('$HOME/.claude/CLAUDE.md', 'w'); f.write(c + '\n'); f.close()
+"
+
+# Step 3: Remove files
 rm -rf ~/.claude/skills/brainless
 rm -rf ~/.claude/commands/brain-*.md
 rm -rf ~/.claude/brainless
 ```
-Then:
-1. Remove the `## Brainless Auto-Behaviors` section from `~/.claude/CLAUDE.md`
-2. Remove the Bash hook entry from `~/.claude/settings.json` (under `hooks.PostToolUse`)
 
 ---
 
