@@ -1,5 +1,11 @@
 # Brainless — Your External Brain for Claude Code
 
+<p align="center">
+  <a href="https://github.com/ImCoriander/Claude-Brainless-Skills/stargazers"><img src="https://img.shields.io/github/stars/ImCoriander/Claude-Brainless-Skills?style=social" alt="GitHub Stars"></a>
+  <a href="https://github.com/ImCoriander/Claude-Brainless-Skills/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ImCoriander/Claude-Brainless-Skills" alt="License"></a>
+  <a href="https://github.com/ImCoriander/Claude-Brainless-Skills/issues"><img src="https://img.shields.io/github/issues/ImCoriander/Claude-Brainless-Skills" alt="Issues"></a>
+</p>
+
 > **[中文文档 / Chinese Documentation](./README_CN.md)**
 
 ---
@@ -37,6 +43,14 @@ Every developer has experienced this:
 ---
 
 ## Features
+
+### Auto-Search Hook — True Automation
+
+Brainless installs a **PostToolUse hook** in Claude Code's `settings.json`. Every time a Bash command fails (non-zero exit code), the hook automatically searches your knowledge base and injects matching solutions into Claude's context. **No prompt instructions needed — this works even if context is compressed.**
+
+```
+Bash fails → Hook fires → _cache.json searched → [BRAINLESS] solution shown → Claude applies fix
+```
 
 ### Auto-Record — Zero Manual Effort
 
@@ -109,6 +123,10 @@ Level 3: entry.md        →  Full content             (only on match)
 
 Entries automatically link to each other via `related: []` fields. When you view one entry, related entries appear as "See also". Knowledge compounds over time — solving one problem helps you find the next.
 
+### Index Rebuild
+
+`/brain-rebuild` scans all entry files and rebuilds `_cache.json` and all `_index.md` files from scratch. Use it when indexes get out of sync, after manual edits, or as a periodic health check.
+
 ### Weakness Analysis
 
 `/brain-stats` doesn't just show counts — it analyzes your weak spots:
@@ -148,6 +166,7 @@ Every time a past solution is recalled, the entry's `hit_count` increments and `
 | `/brain-stats` | View stats + weakness analysis |
 | `/brain-review` | Spaced repetition review session |
 | `/brain-cheatsheet [cat]` | Generate a cheat sheet for a category |
+| `/brain-rebuild` | Rebuild all indexes from entry files (fix desync) |
 
 ---
 
@@ -157,10 +176,10 @@ Every time a past solution is recalled, the entry's `hit_count` increments and `
    Error occurs                      CTF challenge solved
         |                                   |
         v                                   v
-  [Auto-Search Brain]               [Auto-Record to Brain]
+  [Hook auto-searches brain]         [Auto-Record to Brain]
         |                                   |
    Found match?                      Write entry + update indexes
-    /        \                        + cross-reference
+    /        \                        + cross-reference + _cache.json
   Yes         No
    |           |
 Apply fix    Debug normally → Solved? → Auto-Record
@@ -172,35 +191,41 @@ Apply fix    Debug normally → Solved? → Auto-Record
 
 **Linux / macOS / Git Bash:**
 ```bash
-tar xzf brainless-skill.tar.gz
-cd brainless-skill
+git clone https://github.com/ImCoriander/Claude-Brainless-Skills.git
+cd Claude-Brainless-Skills
 bash install.sh
 ```
 
 **Windows (CMD / PowerShell):**
 ```cmd
-cd brainless-skill
+git clone https://github.com/ImCoriander/Claude-Brainless-Skills.git
+cd Claude-Brainless-Skills
 install.bat
 ```
 
 **Requirements:**
 - Claude Code installed (`~/.claude/` directory exists)
+- Python 3 (for auto-search hook)
 
 **What gets installed:**
 
 ```
 ~/.claude/
 ├── CLAUDE.md                    # Auto-behavior rules (appended)
+├── settings.json                # Hook config (merged)
 ├── skills/brainless/SKILL.md    # Core skill definition
 ├── commands/
 │   ├── brain-dump.md            # /brain-dump command
 │   ├── brain-search.md          # /brain-search command
 │   ├── brain-stats.md           # /brain-stats command
 │   ├── brain-review.md          # /brain-review command
-│   └── brain-cheatsheet.md      # /brain-cheatsheet command
+│   ├── brain-cheatsheet.md      # /brain-cheatsheet command
+│   └── brain-rebuild.md         # /brain-rebuild command
 └── brainless/                   # Knowledge base data
     ├── INDEX.md                 # Master index
     ├── _cache.json              # Fast search cache
+    ├── hooks/
+    │   └── bash_error_search.py # Auto-search hook script
     └── <13 category dirs>/      # Category sub-indexes + entries
 ```
 
@@ -210,11 +235,15 @@ Claude Code skills are only loaded when their triggers match. But auto-behaviors
 
 If you already have a `CLAUDE.md`, the installer **appends** the brainless section without touching your existing content. Re-running the installer updates the section in place.
 
+### Why does it modify settings.json?
+
+The installer adds a **PostToolUse hook** for the Bash tool. This hook runs a Python script that checks `_cache.json` whenever a command fails — providing true automation that doesn't depend on prompt instructions. The installer safely merges the hook into your existing settings without overwriting anything.
+
 ---
 
 ## Upgrade
 
-Re-running `install.sh` updates the skill and commands while **preserving your existing knowledge base data**.
+Re-running `install.sh` updates the skill, commands, and hook while **preserving your existing knowledge base data**.
 
 ---
 
@@ -226,7 +255,21 @@ rm -rf ~/.claude/skills/brainless
 rm -rf ~/.claude/commands/brain-*.md
 rm -rf ~/.claude/brainless
 ```
-Then remove the `## Brainless Auto-Behaviors` section from `~/.claude/CLAUDE.md`.
+Then:
+1. Remove the `## Brainless Auto-Behaviors` section from `~/.claude/CLAUDE.md`
+2. Remove the Bash hook entry from `~/.claude/settings.json` (under `hooks.PostToolUse`)
+
+---
+
+## Star History
+
+<a href="https://star-history.com/#ImCoriander/Claude-Brainless-Skills&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ImCoriander/Claude-Brainless-Skills&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ImCoriander/Claude-Brainless-Skills&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=ImCoriander/Claude-Brainless-Skills&type=Date" />
+ </picture>
+</a>
 
 ---
 

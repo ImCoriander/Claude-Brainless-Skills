@@ -1,6 +1,6 @@
 ---
 name: brainless
-description: "Brainless (没脑子) — ALWAYS ACTIVE. Your external brain. You don't need memory, I remember EVERYTHING for you. A persistent knowledge management system for errors, CTF challenges, reverse engineering, tricks, and tool usage. CRITICAL BEHAVIORAL RULES (enforce even when skill body is not loaded): (1) ON ANY non-zero exit code or unexpected error: IMMEDIATELY invoke /brain-search BEFORE attempting fixes — check if this problem was solved before; (2) AFTER resolving any non-trivial error (not a simple typo): IMMEDIATELY invoke /brain-dump to record the problem and solution BEFORE continuing to the next step — do NOT wait until the task is finished or the user asks; (3) NEVER batch recordings — record each issue individually as it is resolved. Also covers: CTF writeups (pwn/web/crypto/rev/misc), IDA/Ghidra reversing notes, useful tricks, tool techniques. Triggers: '/brain-dump', '/brain-search', '/brain-review', '/brain-cheatsheet', '/brain-stats', 'record this', 'have we seen this', any error/warning output, CTF problem solving, reverse engineering analysis."
+description: "Brainless (没脑子) — ALWAYS ACTIVE. Your external brain. You don't need memory, I remember EVERYTHING for you. A persistent knowledge management system for errors, CTF challenges, reverse engineering, tricks, and tool usage. CRITICAL BEHAVIORAL RULES (enforce even when skill body is not loaded): (1) ON ANY non-zero exit code or unexpected error: IMMEDIATELY invoke /brain-search BEFORE attempting fixes — check if this problem was solved before; (2) AFTER resolving any non-trivial error (not a simple typo): IMMEDIATELY invoke /brain-dump to record the problem and solution BEFORE continuing to the next step — do NOT wait until the task is finished or the user asks; (3) NEVER batch recordings — record each issue individually as it is resolved. Also covers: CTF writeups (pwn/web/crypto/rev/misc), IDA/Ghidra reversing notes, useful tricks, tool techniques. Triggers: '/brain-dump', '/brain-search', '/brain-review', '/brain-cheatsheet', '/brain-stats', '/brain-rebuild', 'record this', 'have we seen this', any error/warning output, CTF problem solving, reverse engineering analysis."
 ---
 
 # Brainless — Your External Brain
@@ -322,12 +322,14 @@ Triggered when:
 
 7. **Scan for cross-references** — if the new entry references techniques, tools, or errors from other entries, add their filenames to the `related: []` frontmatter field, and add a back-reference in those entries too
 
-8. **Update all indexes** (in this order):
-   a. **`_cache.json`** — add entry to `entries[]`, add tags to `tags_index`, increment `total`, update `updated` date
-   b. **`<category>/_index.md`** — add one-line entry to the sub-index
+8. **Update all indexes** (in this order — ALL steps are MANDATORY, do NOT skip any):
+   a. **`_cache.json`** — add entry to `entries[]` with fields: `id` (category/slug), `title`, `category`, `tags`, `error_pattern` (regex from error message), `solution_hint` (one-line), `hit_count`, `last_hit`. Add tags to `tags_index`. Increment `total`. Update `updated` date. **WARNING: If you skip this step, the auto-search hook and Mode 4 will NOT find the entry!**
+   b. **`<category>/_index.md`** — add one-line entry to the sub-index table
    c. **`INDEX.md`** — increment the count for the category, update total
 
 9. **Confirm to user** — show what was recorded
+
+> **Common failure mode:** Writing the .md file but forgetting to update `_cache.json`. This makes the entry invisible to all search mechanisms. If you suspect desync, run `/brain-rebuild`.
 
 ### Mode 2: Brain Search (`/brain-search`) — 3-Level Strategy
 
@@ -458,6 +460,38 @@ Auto-generate condensed cheat sheets from accumulated entries:
 ```
 
 Save generated cheat sheets to `~/.claude/brainless/_cheatsheets/[category].md`
+
+### Mode 8: Brain Rebuild (`/brain-rebuild`)
+
+Rebuild all indexes from existing entry files. Fixes desync between `.md` entries and `_cache.json`/`_index.md` indexes.
+
+**When to use:**
+- `_cache.json` is empty but entry files exist
+- Auto-search isn't finding entries that you know exist
+- After manual edits to entry files
+- As a periodic health check
+
+**Workflow:**
+1. Scan all category directories for `.md` files (excluding `_index.md`)
+2. Read YAML frontmatter from each entry
+3. Rebuild `_cache.json` from scratch (entries, tags_index, total, updated)
+4. Rebuild each `<category>/_index.md` with correct table of entries
+5. Rebuild `INDEX.md` with correct counts
+6. Report results
+
+---
+
+## Auto-Search Hook
+
+Brainless installs a **PostToolUse hook** in `settings.json` that automatically searches the knowledge base when any Bash command fails (non-zero exit code). This is a real automation — not dependent on prompt instructions.
+
+**How it works:**
+- Hook script: `~/.claude/brainless/hooks/bash_error_search.py`
+- Triggered: after every Bash tool use
+- Action: reads stdin JSON → extracts exit code → if non-zero, searches `_cache.json` → outputs matching entries
+- Output is fed back into Claude's context as `[BRAINLESS]` messages
+
+**This means:** even if CLAUDE.md instructions are lost due to context compression, the hook will still fire and surface relevant knowledge from the brain.
 
 ---
 

@@ -20,23 +20,35 @@ if not exist "%CLAUDE_DIR%" (
     exit /b 1
 )
 
-echo [1/6] Creating brain structure...
-for %%d in (skills\brainless commands) do (
+echo [1/7] Creating brain structure...
+for %%d in (skills\brainless commands brainless\hooks) do (
     if not exist "%CLAUDE_DIR%\%%d" mkdir "%CLAUDE_DIR%\%%d"
 )
 for %%d in (build runtime config network dependency permission logic ctf reversing exploit tricks tools other _cheatsheets) do (
     if not exist "%CLAUDE_DIR%\brainless\%%d" mkdir "%CLAUDE_DIR%\brainless\%%d"
 )
 
-echo [2/6] Installing skill...
+echo [2/7] Installing skill...
 copy /y "%SCRIPT_DIR%skills\brainless\SKILL.md" "%CLAUDE_DIR%\skills\brainless\SKILL.md" >nul
 
-echo [3/6] Installing commands...
-for %%c in (brain-dump brain-search brain-review brain-cheatsheet brain-stats) do (
+echo [3/7] Installing commands...
+for %%c in (brain-dump brain-search brain-review brain-cheatsheet brain-stats brain-rebuild) do (
     copy /y "%SCRIPT_DIR%commands\%%c.md" "%CLAUDE_DIR%\commands\%%c.md" >nul
 )
 
-echo [4/6] Initializing knowledge base...
+echo [4/7] Installing auto-search hook...
+copy /y "%SCRIPT_DIR%hooks\bash_error_search.py" "%CLAUDE_DIR%\brainless\hooks\bash_error_search.py" >nul
+
+:: Inject hook into settings.json using helper script
+set "SETTINGS_FILE=%CLAUDE_DIR%\settings.json"
+findstr /c:"bash_error_search.py" "%SETTINGS_FILE%" >nul 2>&1
+if !errorlevel! neq 0 (
+    python "%SCRIPT_DIR%hooks\install_hook.py" 2>nul || python3 "%SCRIPT_DIR%hooks\install_hook.py" 2>nul
+) else (
+    echo     Hook already configured in settings.json
+)
+
+echo [5/7] Initializing knowledge base...
 if not exist "%CLAUDE_DIR%\brainless\INDEX.md" (
     copy /y "%SCRIPT_DIR%brainless\INDEX.md" "%CLAUDE_DIR%\brainless\INDEX.md" >nul
     copy /y "%SCRIPT_DIR%brainless\_cache.json" "%CLAUDE_DIR%\brainless\_cache.json" >nul
@@ -50,7 +62,7 @@ if not exist "%CLAUDE_DIR%\brainless\INDEX.md" (
     echo     Existing brain found — preserving memories, updating skill only
 )
 
-echo [5/6] Injecting auto-behaviors into CLAUDE.md...
+echo [6/7] Injecting auto-behaviors into CLAUDE.md...
 set "CLAUDE_MD=%CLAUDE_DIR%\CLAUDE.md"
 set "MARKER=## Brainless Auto-Behaviors (MANDATORY)"
 
@@ -120,9 +132,10 @@ if "!HAS_MARKER!"=="1" (
 
 echo     Done — auto-behaviors will now work in every conversation
 
-echo [6/6] Verifying...
+echo [7/7] Verifying...
 echo     Skill:    %CLAUDE_DIR%\skills\brainless\SKILL.md
-echo     Commands: brain-dump, brain-search, brain-stats, brain-review, brain-cheatsheet
+echo     Commands: brain-dump, brain-search, brain-stats, brain-review, brain-cheatsheet, brain-rebuild
+echo     Hook:     %CLAUDE_DIR%\brainless\hooks\bash_error_search.py
 echo     Brain:    %CLAUDE_DIR%\brainless\
 echo     Rules:    %CLAUDE_MD%
 echo.

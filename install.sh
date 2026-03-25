@@ -21,21 +21,34 @@ if [ ! -d "$CLAUDE_DIR" ]; then
     echo "[!] Claude Code not found at $CLAUDE_DIR"; exit 1
 fi
 
-echo "[1/6] Creating brain structure..."
-mkdir -p "$CLAUDE_DIR/skills/brainless" "$CLAUDE_DIR/commands"
+echo "[1/7] Creating brain structure..."
+mkdir -p "$CLAUDE_DIR/skills/brainless" "$CLAUDE_DIR/commands" "$CLAUDE_DIR/brainless/hooks"
 for cat in build runtime config network dependency permission logic ctf reversing exploit tricks tools other _cheatsheets; do
     mkdir -p "$CLAUDE_DIR/brainless/$cat"
 done
 
-echo "[2/6] Installing skill..."
+echo "[2/7] Installing skill..."
 cp "$SCRIPT_DIR/skills/brainless/SKILL.md" "$CLAUDE_DIR/skills/brainless/SKILL.md"
 
-echo "[3/6] Installing commands..."
-for cmd in brain-dump brain-search brain-review brain-cheatsheet brain-stats; do
+echo "[3/7] Installing commands..."
+for cmd in brain-dump brain-search brain-review brain-cheatsheet brain-stats brain-rebuild; do
     cp "$SCRIPT_DIR/commands/$cmd.md" "$CLAUDE_DIR/commands/$cmd.md"
 done
 
-echo "[4/6] Initializing knowledge base..."
+echo "[4/7] Installing auto-search hook..."
+cp "$SCRIPT_DIR/hooks/bash_error_search.py" "$CLAUDE_DIR/brainless/hooks/bash_error_search.py"
+
+# Inject hook into settings.json
+SETTINGS_FILE="$CLAUDE_DIR/settings.json"
+HOOK_MARKER="bash_error_search.py"
+
+if [ -f "$SETTINGS_FILE" ] && grep -qF "$HOOK_MARKER" "$SETTINGS_FILE"; then
+    echo "    Hook already configured in settings.json"
+else
+    python3 "$SCRIPT_DIR/hooks/install_hook.py" 2>/dev/null || python "$SCRIPT_DIR/hooks/install_hook.py"
+fi
+
+echo "[5/7] Initializing knowledge base..."
 if [ ! -f "$CLAUDE_DIR/brainless/INDEX.md" ]; then
     cp "$SCRIPT_DIR/brainless/INDEX.md" "$CLAUDE_DIR/brainless/INDEX.md"
     cp "$SCRIPT_DIR/brainless/_cache.json" "$CLAUDE_DIR/brainless/_cache.json"
@@ -47,7 +60,7 @@ else
     echo "    Existing brain found — preserving memories, updating skill only"
 fi
 
-echo "[5/6] Injecting auto-behaviors into CLAUDE.md..."
+echo "[6/7] Injecting auto-behaviors into CLAUDE.md..."
 CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
 MARKER="## Brainless Auto-Behaviors (MANDATORY)"
 
@@ -109,15 +122,16 @@ BRAINLESS_RULES
 
 echo "    Done — auto-behaviors will now work in every conversation"
 
-echo "[6/6] Verifying..."
+echo "[7/7] Verifying..."
 echo "    Skill:    $CLAUDE_DIR/skills/brainless/SKILL.md"
-echo "    Commands: brain-dump, brain-search, brain-stats, brain-review, brain-cheatsheet"
+echo "    Commands: brain-dump, brain-search, brain-stats, brain-review, brain-cheatsheet, brain-rebuild"
+echo "    Hook:     $CLAUDE_DIR/brainless/hooks/bash_error_search.py"
 echo "    Brain:    $CLAUDE_DIR/brainless/"
 
 echo ""
 echo "=== Brainless installed! ==="
 echo ""
-echo "Commands:   /brain-dump  /brain-search  /brain-stats  /brain-review  /brain-cheatsheet"
+echo "Commands:   /brain-dump  /brain-search  /brain-stats  /brain-review  /brain-cheatsheet  /brain-rebuild"
 echo "Categories: build runtime config network dependency permission logic"
 echo "            ctf reversing exploit tricks tools"
 echo ""
