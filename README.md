@@ -44,12 +44,30 @@ Every developer has experienced this:
 
 ## Features
 
-### Auto-Search Hook — True Automation
+### Lifecycle Hooks — True Automation
 
-Brainless installs a **PostToolUse hook** in Claude Code's `settings.json`. Every time a Bash command fails (non-zero exit code), the hook automatically searches your knowledge base and injects matching solutions into Claude's context. **No prompt instructions needed — this works even if context is compressed.**
+Brainless installs **4 hooks** covering the entire Claude Code session lifecycle. These are real automations in `settings.json` — **no prompt instructions needed, works even if context is compressed.**
+
+| Hook Event | Script | What It Does |
+|-----------|--------|-------------|
+| **SessionStart** | `session_start.py` | Injects brain context at session start — total entries, project-specific known issues (matched by cwd/repo), recent entries |
+| **PostToolUse** (Bash) | `bash_error_search.py` | Auto-searches knowledge base when any command fails (non-zero exit code), tracks unmatched errors |
+| **PostToolUse** (Edit\|Write) | `post_tool_logger.py` | Logs file edits and checks if modified files relate to known KB entries |
+| **Stop** | `session_end.py` | Logs session summary (duration, tool count, brain hits) and **alerts about unrecorded errors** that need `/brain-dump` |
 
 ```
-Bash fails → Hook fires → _cache.json searched → [BRAINLESS] solution shown → Claude applies fix
+SessionStart                   PostToolUse(Bash)               Stop
+    |                                |                            |
+    v                                v                            v
+ Load _cache.json             Error? Search _cache.json     Read _session_errors.json
+ Search by cwd/repo            |-- Match → show solution     |-- Unrecorded errors → remind /brain-dump
+ Show project-specific issues  |-- No match → track error    |-- Log duration/tools/hits
+ Reset session tracking        v                              Clean up temp files
+                          PostToolUse(Edit|Write)
+                               |
+                               v
+                          Log activity
+                          Match file → KB entries
 ```
 
 ### Auto-Record — Zero Manual Effort
@@ -173,16 +191,17 @@ Every time a past solution is recalled, the entry's `hit_count` increments and `
 ## How It Works
 
 ```
-   Error occurs                      CTF challenge solved
-        |                                   |
-        v                                   v
-  [Hook auto-searches brain]         [Auto-Record to Brain]
-        |                                   |
-   Found match?                      Write entry + update indexes
-    /        \                        + cross-reference + _cache.json
-  Yes         No
-   |           |
-Apply fix    Debug normally → Solved? → Auto-Record
+  Session starts                     Error occurs                     Session ends
+       |                                  |                                |
+       v                                  v                                v
+ [SessionStart Hook]              [PostToolUse Hook]               [Stop Hook]
+ Load brain context               Search _cache.json               Check unrecorded errors
+ Show project known issues         /        \                      Remind: /brain-dump
+       |                         Yes         No                    Log session summary
+       v                          |           |
+ Claude starts with              Apply fix    Debug → Solved?
+ full brain awareness                         → Auto-Record
+                                              → Track for session end
 ```
 
 ---
@@ -225,7 +244,10 @@ install.bat
     ├── INDEX.md                 # Master index
     ├── _cache.json              # Fast search cache
     ├── hooks/
-    │   └── bash_error_search.py # Auto-search hook script
+    │   ├── session_start.py     # SessionStart hook — context injection
+    │   ├── bash_error_search.py # PostToolUse(Bash) — error auto-search
+    │   ├── post_tool_logger.py  # PostToolUse(Edit|Write) — activity log
+    │   └── session_end.py       # Stop hook — session summary + alerts
     └── <13 category dirs>/      # Category sub-indexes + entries
 ```
 
@@ -237,7 +259,7 @@ If you already have a `CLAUDE.md`, the installer **appends** the brainless secti
 
 ### Why does it modify settings.json?
 
-The installer adds a **PostToolUse hook** for the Bash tool. This hook runs a Python script that checks `_cache.json` whenever a command fails — providing true automation that doesn't depend on prompt instructions. The installer safely merges the hook into your existing settings without overwriting anything.
+The installer registers **4 lifecycle hooks** (SessionStart, PostToolUse for Bash, PostToolUse for Edit/Write, and Stop). These hooks run Python scripts that provide true automation independent of prompt instructions — context injection at session start, error auto-search on failures, activity logging on file edits, and session summary with unrecorded error alerts at session end. The installer safely merges hooks into your existing settings without overwriting anything.
 
 ---
 
@@ -258,31 +280,24 @@ bash uninstall.sh
 uninstall.bat
 ```
 
-**Manual — Important: Remove the hook from settings.json FIRST, before deleting files.** Otherwise the hook will fire on every Bash command and produce blocking errors because the script no longer exists.
+**Manual — Important: Remove hooks from settings.json FIRST, before deleting files.** Otherwise hooks will fire and produce blocking errors because the scripts no longer exist.
 
 ```bash
-# Step 1: Remove hook from settings.json (use Python helper)
+# Step 1: Remove all brainless hooks from settings.json
 python3 -c "
 import json
+MARKERS = ['bash_error_search', 'session_start', 'post_tool_logger', 'session_end']
 f = open('$HOME/.claude/settings.json', 'r'); s = json.load(f); f.close()
-hooks = s.get('hooks', {}).get('PostToolUse', [])
-s['hooks']['PostToolUse'] = [h for h in hooks if h.get('matcher') != 'Bash' or not any('bash_error_search' in hk.get('command', '') for hk in h.get('hooks', []))]
-f = open('$HOME/.claude/settings.json', 'w'); json.dump(s, f, indent=2, ensure_ascii=False); f.close()
-" 2>/dev/null || python -c "
-import json
-f = open('$HOME/.claude/settings.json', 'r'); s = json.load(f); f.close()
-hooks = s.get('hooks', {}).get('PostToolUse', [])
-s['hooks']['PostToolUse'] = [h for h in hooks if h.get('matcher') != 'Bash' or not any('bash_error_search' in hk.get('command', '') for hk in h.get('hooks', []))]
+hooks = s.get('hooks', {})
+for event in ['SessionStart', 'PostToolUse', 'Stop']:
+    entries = hooks.get(event, [])
+    hooks[event] = [h for h in entries if not any(m in hk.get('command', '') for hk in h.get('hooks', []) for m in MARKERS)]
+    if not hooks[event]: del hooks[event]
 f = open('$HOME/.claude/settings.json', 'w'); json.dump(s, f, indent=2, ensure_ascii=False); f.close()
 "
 
 # Step 2: Remove the Brainless section from CLAUDE.md
 python3 -c "
-import re
-f = open('$HOME/.claude/CLAUDE.md', 'r'); c = f.read(); f.close()
-c = re.sub(r'\n*## Brainless Auto-Behaviors \(MANDATORY\).*?(?=\n## (?!Brainless)|$)', '', c, flags=re.DOTALL).strip()
-f = open('$HOME/.claude/CLAUDE.md', 'w'); f.write(c + '\n'); f.close()
-" 2>/dev/null || python -c "
 import re
 f = open('$HOME/.claude/CLAUDE.md', 'r'); c = f.read(); f.close()
 c = re.sub(r'\n*## Brainless Auto-Behaviors \(MANDATORY\).*?(?=\n## (?!Brainless)|$)', '', c, flags=re.DOTALL).strip()

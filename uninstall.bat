@@ -6,15 +6,15 @@ echo Uninstalling Brainless...
 
 set "CLAUDE_DIR=%USERPROFILE%\.claude"
 
-:: Step 1: Remove hook from settings.json FIRST (before deleting files)
-echo [1/3] Removing hook from settings.json...
+:: Step 1: Remove all brainless hooks from settings.json FIRST (before deleting files)
+echo [1/3] Removing hooks from settings.json...
 set "SETTINGS_FILE=%CLAUDE_DIR%\settings.json"
-findstr /c:"bash_error_search" "%SETTINGS_FILE%" >nul 2>&1
+findstr /c:"brainless" "%SETTINGS_FILE%" >nul 2>&1
 if !errorlevel! equ 0 (
-    python -c "import json;f=open(r'%SETTINGS_FILE%','r');s=json.load(f);f.close();hooks=s.get('hooks',{}).get('PostToolUse',[]);s['hooks']['PostToolUse']=[h for h in hooks if h.get('matcher')!='Bash' or not any('bash_error_search' in hk.get('command','') for hk in h.get('hooks',[]))];f=open(r'%SETTINGS_FILE%','w');json.dump(s,f,indent=2,ensure_ascii=False);f.close()" 2>nul || python3 -c "import json;f=open(r'%SETTINGS_FILE%','r');s=json.load(f);f.close();hooks=s.get('hooks',{}).get('PostToolUse',[]);s['hooks']['PostToolUse']=[h for h in hooks if h.get('matcher')!='Bash' or not any('bash_error_search' in hk.get('command','') for hk in h.get('hooks',[]))];f=open(r'%SETTINGS_FILE%','w');json.dump(s,f,indent=2,ensure_ascii=False);f.close()" 2>nul
-    echo     Hook removed
+    python -c "import json;MARKERS=['bash_error_search','session_start','post_tool_logger','session_end'];f=open(r'%SETTINGS_FILE%','r');s=json.load(f);f.close();hooks=s.get('hooks',{});[hooks.__setitem__(e,[h for h in hooks.get(e,[]) if not any(m in hk.get('command','') for hk in h.get('hooks',[]) for m in MARKERS)]) or (not hooks[e] and hooks.pop(e,None)) for e in ['SessionStart','PostToolUse','Stop']];f=open(r'%SETTINGS_FILE%','w');json.dump(s,f,indent=2,ensure_ascii=False);f.close()" 2>nul || python3 -c "import json;MARKERS=['bash_error_search','session_start','post_tool_logger','session_end'];f=open(r'%SETTINGS_FILE%','r');s=json.load(f);f.close();hooks=s.get('hooks',{});[hooks.__setitem__(e,[h for h in hooks.get(e,[]) if not any(m in hk.get('command','') for hk in h.get('hooks',[]) for m in MARKERS)]) or (not hooks[e] and hooks.pop(e,None)) for e in ['SessionStart','PostToolUse','Stop']];f=open(r'%SETTINGS_FILE%','w');json.dump(s,f,indent=2,ensure_ascii=False);f.close()" 2>nul
+    echo     All hooks removed
 ) else (
-    echo     No hook found, skipping
+    echo     No hooks found, skipping
 )
 
 :: Step 2: Remove Brainless section from CLAUDE.md

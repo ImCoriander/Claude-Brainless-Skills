@@ -36,17 +36,13 @@ for %%c in (brain-dump brain-search brain-review brain-cheatsheet brain-stats br
     copy /y "%SCRIPT_DIR%commands\%%c.md" "%CLAUDE_DIR%\commands\%%c.md" >nul
 )
 
-echo [4/7] Installing auto-search hook...
-copy /y "%SCRIPT_DIR%hooks\bash_error_search.py" "%CLAUDE_DIR%\brainless\hooks\bash_error_search.py" >nul
-
-:: Inject hook into settings.json using helper script
-set "SETTINGS_FILE=%CLAUDE_DIR%\settings.json"
-findstr /c:"bash_error_search.py" "%SETTINGS_FILE%" >nul 2>&1
-if !errorlevel! neq 0 (
-    python "%SCRIPT_DIR%hooks\install_hook.py" 2>nul || python3 "%SCRIPT_DIR%hooks\install_hook.py" 2>nul
-) else (
-    echo     Hook already configured in settings.json
+echo [4/7] Installing hooks...
+for %%h in (bash_error_search.py session_start.py post_tool_logger.py session_end.py) do (
+    copy /y "%SCRIPT_DIR%hooks\%%h" "%CLAUDE_DIR%\brainless\hooks\%%h" >nul
 )
+
+:: Inject all hooks into settings.json (install_hook.py handles idempotency)
+python "%SCRIPT_DIR%hooks\install_hook.py" 2>nul || python3 "%SCRIPT_DIR%hooks\install_hook.py" 2>nul
 
 echo [5/7] Initializing knowledge base...
 if not exist "%CLAUDE_DIR%\brainless\INDEX.md" (
@@ -135,7 +131,7 @@ echo     Done — auto-behaviors will now work in every conversation
 echo [7/7] Verifying...
 echo     Skill:    %CLAUDE_DIR%\skills\brainless\SKILL.md
 echo     Commands: brain-dump, brain-search, brain-stats, brain-review, brain-cheatsheet, brain-rebuild
-echo     Hook:     %CLAUDE_DIR%\brainless\hooks\bash_error_search.py
+echo     Hooks:    %CLAUDE_DIR%\brainless\hooks\ (SessionStart + PostToolUse + Stop)
 echo     Brain:    %CLAUDE_DIR%\brainless\
 echo     Rules:    %CLAUDE_MD%
 echo.
@@ -145,6 +141,7 @@ echo Commands:   /brain-dump  /brain-search  /brain-stats  /brain-review  /brain
 echo Categories: build runtime config network dependency permission logic
 echo             ctf reversing exploit tricks tools
 echo.
+echo Hooks:      SessionStart (context) ^| PostToolUse (search + log) ^| Stop (summary)
 echo Auto: search brain before fixing ^| record after resolving
 echo Optimization: 3-level search (JSON cache -^> sub-index -^> full entry)
 echo.

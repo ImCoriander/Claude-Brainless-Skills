@@ -35,18 +35,13 @@ for cmd in brain-dump brain-search brain-review brain-cheatsheet brain-stats bra
     cp "$SCRIPT_DIR/commands/$cmd.md" "$CLAUDE_DIR/commands/$cmd.md"
 done
 
-echo "[4/7] Installing auto-search hook..."
-cp "$SCRIPT_DIR/hooks/bash_error_search.py" "$CLAUDE_DIR/brainless/hooks/bash_error_search.py"
+echo "[4/7] Installing hooks..."
+for hook_file in bash_error_search.py session_start.py post_tool_logger.py session_end.py; do
+    cp "$SCRIPT_DIR/hooks/$hook_file" "$CLAUDE_DIR/brainless/hooks/$hook_file"
+done
 
-# Inject hook into settings.json
-SETTINGS_FILE="$CLAUDE_DIR/settings.json"
-HOOK_MARKER="bash_error_search.py"
-
-if [ -f "$SETTINGS_FILE" ] && grep -qF "$HOOK_MARKER" "$SETTINGS_FILE"; then
-    echo "    Hook already configured in settings.json"
-else
-    python3 "$SCRIPT_DIR/hooks/install_hook.py" 2>/dev/null || python "$SCRIPT_DIR/hooks/install_hook.py"
-fi
+# Inject all hooks into settings.json (install_hook.py handles idempotency)
+python3 "$SCRIPT_DIR/hooks/install_hook.py" 2>/dev/null || python "$SCRIPT_DIR/hooks/install_hook.py"
 
 echo "[5/7] Initializing knowledge base..."
 if [ ! -f "$CLAUDE_DIR/brainless/INDEX.md" ]; then
@@ -125,7 +120,7 @@ echo "    Done — auto-behaviors will now work in every conversation"
 echo "[7/7] Verifying..."
 echo "    Skill:    $CLAUDE_DIR/skills/brainless/SKILL.md"
 echo "    Commands: brain-dump, brain-search, brain-stats, brain-review, brain-cheatsheet, brain-rebuild"
-echo "    Hook:     $CLAUDE_DIR/brainless/hooks/bash_error_search.py"
+echo "    Hooks:    $CLAUDE_DIR/brainless/hooks/ (SessionStart + PostToolUse + Stop)"
 echo "    Brain:    $CLAUDE_DIR/brainless/"
 
 echo ""
@@ -135,6 +130,7 @@ echo "Commands:   /brain-dump  /brain-search  /brain-stats  /brain-review  /brai
 echo "Categories: build runtime config network dependency permission logic"
 echo "            ctf reversing exploit tricks tools"
 echo ""
+echo "Hooks:      SessionStart (context) | PostToolUse (search + log) | Stop (summary)"
 echo "Auto: search brain before fixing | record after resolving"
 echo "Optimization: 3-level search (JSON cache -> sub-index -> full entry)"
 echo ""

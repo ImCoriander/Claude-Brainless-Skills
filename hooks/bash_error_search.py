@@ -16,9 +16,12 @@ import sys
 import json
 import re
 import os
+from datetime import datetime
 
 BRAINLESS_DIR = os.path.join(os.path.expanduser("~"), ".claude", "brainless")
 CACHE_FILE = os.path.join(BRAINLESS_DIR, "_cache.json")
+HOOKS_DIR = os.path.join(BRAINLESS_DIR, "hooks")
+SESSION_ERRORS_FILE = os.path.join(HOOKS_DIR, "_session_errors.json")
 
 
 def main():
@@ -122,6 +125,36 @@ def main():
             print(f"    Solution: {entry.get('solution_hint', 'See full entry')}")
             print(f"    File: {entry_path}")
         print("[BRAINLESS] Read the entry file(s) above for full solution details.")
+    else:
+        # No match found — track as unrecorded error for session summary
+        _track_unrecorded_error(command, output_text, exit_code)
+
+
+def _track_unrecorded_error(command, output_text, exit_code):
+    """Record unmatched errors so session_end.py can remind about /brain-dump."""
+    try:
+        os.makedirs(HOOKS_DIR, exist_ok=True)
+        errors = []
+        if os.path.exists(SESSION_ERRORS_FILE):
+            with open(SESSION_ERRORS_FILE, "r", encoding="utf-8") as f:
+                errors = json.load(f)
+
+        # Keep a short summary (avoid bloating the file)
+        error_line = output_text.strip().split("\n")[0][:200] if output_text else ""
+        errors.append({
+            "command": command[:200],
+            "error_snippet": error_line,
+            "exit_code": exit_code,
+            "time": datetime.now().strftime("%H:%M:%S"),
+        })
+
+        # Cap at 50 errors per session
+        errors = errors[-50:]
+
+        with open(SESSION_ERRORS_FILE, "w", encoding="utf-8") as f:
+            json.dump(errors, f, ensure_ascii=False)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

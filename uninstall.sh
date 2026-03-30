@@ -6,30 +6,40 @@ CLAUDE_DIR="$HOME/.claude"
 
 echo "Uninstalling Brainless..."
 
-# Step 1: Remove hook from settings.json FIRST (before deleting files)
-echo "[1/3] Removing hook from settings.json..."
+# Step 1: Remove all brainless hooks from settings.json FIRST (before deleting files)
+echo "[1/3] Removing hooks from settings.json..."
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
-if [ -f "$SETTINGS_FILE" ] && grep -qF "bash_error_search" "$SETTINGS_FILE"; then
+if [ -f "$SETTINGS_FILE" ] && grep -qF "brainless" "$SETTINGS_FILE"; then
     python3 -c "
 import json
+MARKERS = ['bash_error_search', 'session_start', 'post_tool_logger', 'session_end']
 with open('$SETTINGS_FILE', 'r') as f:
     s = json.load(f)
-hooks = s.get('hooks', {}).get('PostToolUse', [])
-s['hooks']['PostToolUse'] = [h for h in hooks if h.get('matcher') != 'Bash' or not any('bash_error_search' in hk.get('command', '') for hk in h.get('hooks', []))]
+hooks = s.get('hooks', {})
+for event in ['SessionStart', 'PostToolUse', 'Stop']:
+    entries = hooks.get(event, [])
+    hooks[event] = [h for h in entries if not any(m in hk.get('command', '') for hk in h.get('hooks', []) for m in MARKERS)]
+    if not hooks[event]:
+        del hooks[event]
 with open('$SETTINGS_FILE', 'w') as f:
     json.dump(s, f, indent=2, ensure_ascii=False)
 " 2>/dev/null || python -c "
 import json
+MARKERS = ['bash_error_search', 'session_start', 'post_tool_logger', 'session_end']
 with open('$SETTINGS_FILE', 'r') as f:
     s = json.load(f)
-hooks = s.get('hooks', {}).get('PostToolUse', [])
-s['hooks']['PostToolUse'] = [h for h in hooks if h.get('matcher') != 'Bash' or not any('bash_error_search' in hk.get('command', '') for hk in h.get('hooks', []))]
+hooks = s.get('hooks', {})
+for event in ['SessionStart', 'PostToolUse', 'Stop']:
+    entries = hooks.get(event, [])
+    hooks[event] = [h for h in entries if not any(m in hk.get('command', '') for hk in h.get('hooks', []) for m in MARKERS)]
+    if not hooks[event]:
+        del hooks[event]
 with open('$SETTINGS_FILE', 'w') as f:
     json.dump(s, f, indent=2, ensure_ascii=False)
 "
-    echo "    Hook removed"
+    echo "    All hooks removed"
 else
-    echo "    No hook found, skipping"
+    echo "    No hooks found, skipping"
 fi
 
 # Step 2: Remove Brainless section from CLAUDE.md
