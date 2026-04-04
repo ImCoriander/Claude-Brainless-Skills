@@ -8,6 +8,30 @@ HOOKS_BASE = "~/.claude/brainless/hooks"
 
 # All hooks brainless needs to register
 BRAINLESS_HOOKS = {
+    "PreToolUse": [
+        {
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"python {HOOKS_BASE}/streak_reminder.py",
+                    "timeout": 3,
+                    "statusMessage": "Brainless: checking error streak..."
+                }
+            ]
+        }
+    ],
+    "UserPromptSubmit": [
+        {
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"python {HOOKS_BASE}/user_prompt_search.py",
+                    "timeout": 5,
+                    "statusMessage": "Brainless: pre-searching brain..."
+                }
+            ]
+        }
+    ],
     "SessionStart": [
         {
             "hooks": [
@@ -22,11 +46,10 @@ BRAINLESS_HOOKS = {
     ],
     "PostToolUse": [
         {
-            "matcher": "Bash",
             "hooks": [
                 {
                     "type": "command",
-                    "command": f"python {HOOKS_BASE}/bash_error_search.py",
+                    "command": f"python {HOOKS_BASE}/universal_error_search.py",
                     "timeout": 5,
                     "statusMessage": "Brainless: checking knowledge base..."
                 }
@@ -40,6 +63,66 @@ BRAINLESS_HOOKS = {
                     "command": f"python {HOOKS_BASE}/post_tool_logger.py",
                     "timeout": 5,
                     "statusMessage": "Brainless: logging activity..."
+                }
+            ]
+        }
+    ],
+    "PostToolUseFailure": [
+        {
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"python {HOOKS_BASE}/universal_error_search.py",
+                    "timeout": 5,
+                    "statusMessage": "Brainless: checking knowledge base..."
+                }
+            ]
+        }
+    ],
+    "PostCompact": [
+        {
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"python {HOOKS_BASE}/post_compact.py",
+                    "timeout": 5,
+                    "statusMessage": "Brainless: restoring brain after compaction..."
+                }
+            ]
+        }
+    ],
+    "CwdChanged": [
+        {
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"python {HOOKS_BASE}/cwd_changed.py",
+                    "timeout": 5,
+                    "statusMessage": "Brainless: loading project context..."
+                }
+            ]
+        }
+    ],
+    "SubagentStop": [
+        {
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"python {HOOKS_BASE}/subagent_stop.py",
+                    "timeout": 5,
+                    "statusMessage": "Brainless: scanning subagent result..."
+                }
+            ]
+        }
+    ],
+    "StopFailure": [
+        {
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"python {HOOKS_BASE}/stop_failure.py",
+                    "timeout": 5,
+                    "statusMessage": "Brainless: tracking API failure..."
                 }
             ]
         }
@@ -61,9 +144,16 @@ BRAINLESS_HOOKS = {
 # Markers to identify brainless-owned hooks
 BRAINLESS_MARKERS = [
     "bash_error_search",
+    "universal_error_search",
     "session_start",
     "post_tool_logger",
     "session_end",
+    "streak_reminder",
+    "user_prompt_search",
+    "post_compact",
+    "cwd_changed",
+    "subagent_stop",
+    "stop_failure",
 ]
 
 
@@ -104,11 +194,18 @@ def main():
     with open(settings_file, "w", encoding="utf-8") as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)
 
-    print("    All hooks configured in settings.json")
-    print("    - SessionStart: brain context injection")
-    print("    - PostToolUse(Bash): error auto-search")
+    print("    All hooks configured in settings.json (10 events)")
+    print("    - PreToolUse: error streak reminder (ALL tools)")
+    print("    - UserPromptSubmit: proactive brain search on user message")
+    print("    - SessionStart: brain context injection + trash talk")
+    print("    - PostToolUse(ALL): universal error search + streak tracking")
+    print("    - PostToolUseFailure(ALL): error search for failed tool calls")
     print("    - PostToolUse(Edit|Write): activity logging + file matching")
-    print("    - Stop: session summary")
+    print("    - PostCompact: re-inject brain after context compression")
+    print("    - CwdChanged: reload brain for new project directory")
+    print("    - SubagentStop: scan subagent results for errors")
+    print("    - StopFailure: track API errors")
+    print("    - Stop: session summary + trash talk")
 
 
 if __name__ == "__main__":

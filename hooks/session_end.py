@@ -18,6 +18,12 @@ import sys
 from datetime import datetime
 
 BRAINLESS_DIR = os.path.join(os.path.expanduser("~"), ".claude", "brainless")
+sys.path.insert(0, os.path.join(BRAINLESS_DIR, "hooks"))
+try:
+    from trash_talk import get_line
+except ImportError:
+    def get_line(cat, **kw):
+        return ""
 HOOKS_DIR = os.path.join(BRAINLESS_DIR, "hooks")
 SESSION_LOG = os.path.join(HOOKS_DIR, "session.log")
 ACTIVITY_LOG = os.path.join(HOOKS_DIR, "activity.log")
@@ -73,7 +79,7 @@ def get_session_duration():
 
 
 def get_unrecorded_errors():
-    """Read unrecorded errors tracked by bash_error_search.py."""
+    """Read unrecorded errors tracked by universal_error_search.py."""
     try:
         if os.path.exists(SESSION_ERRORS_FILE):
             with open(SESSION_ERRORS_FILE, "r", encoding="utf-8") as f:
@@ -118,6 +124,8 @@ def main():
         pass
 
     # Print brief summary to stdout
+    talk = get_line("session_end")
+    print(f"[BRAINLESS] {talk}")
     print(f"[BRAINLESS] Session ended | Duration: {duration} | Tools: {tool_count} | Brain hits: {brain_hits}")
 
     # Alert about unrecorded errors — nudge to /brain-dump

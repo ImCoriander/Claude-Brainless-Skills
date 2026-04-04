@@ -481,17 +481,79 @@ Rebuild all indexes from existing entry files. Fixes desync between `.md` entrie
 
 ---
 
-## Auto-Search Hook
+## Hook System — Full Session Lifecycle
 
-Brainless installs a **PostToolUse hook** in `settings.json` that automatically searches the knowledge base when any Bash command fails (non-zero exit code). This is a real automation — not dependent on prompt instructions.
+Brainless installs hooks across the **entire Claude Code lifecycle** — every tool call is monitored, errors are tracked, and Claude is forced to use its brain when stuck. This is real automation — not dependent on prompt instructions.
 
-**How it works:**
-- Hook script: `~/.claude/brainless/hooks/bash_error_search.py`
-- Triggered: after every Bash tool use
-- Action: reads stdin JSON → extracts exit code → if non-zero, searches `_cache.json` → outputs matching entries
-- Output is fed back into Claude's context as `[BRAINLESS]` messages
+### PreToolUse: Streak Reminder (ALL tools)
+- Hook script: `~/.claude/brainless/hooks/streak_reminder.py`
+- Triggered: **BEFORE every tool call** (all tools, no exceptions)
+- Action: checks `_error_streak.json` — if 2+ consecutive errors detected, injects escalating warnings
+- At 2-3 errors: WARNING — "STOP and think, run /brain-search"
+- At 4+ errors: CRITICAL — "YOU ARE IN A LOOP, CHANGE YOUR APPROACH"
+- Shows the error trail so Claude sees exactly what keeps failing
 
-**This means:** even if CLAUDE.md instructions are lost due to context compression, the hook will still fire and surface relevant knowledge from the brain.
+### PostToolUse: Universal Error Search + Streak Tracking (ALL tools)
+- Hook script: `~/.claude/brainless/hooks/universal_error_search.py`
+- Triggered: **after every tool call** (Bash, Edit, Write, LSP, Agent, Grep, Glob, Read, etc.)
+- Action: detects errors in tool output → searches `_cache.json` → outputs matching entries
+- On error: increments `_error_streak.json` streak counter
+- On success: resets streak counter to 0
+- Escalated output when streak >= 2: appends extra directives to search results
+
+### PostToolUseFailure: Error Search (ALL tools)
+- Same script: `~/.claude/brainless/hooks/universal_error_search.py`
+- Triggered: when any tool call **fails** (permission denied, invalid args, etc.)
+- Special handling: PostToolUseFailure stdout is not visible to Claude, so results are written to `_pending_brainless_output.txt` and flushed on next PostToolUse
+
+### PostToolUse: Activity Logger (Edit|Write)
+- Hook script: `~/.claude/brainless/hooks/post_tool_logger.py`
+- Triggered: after Edit/Write tool calls
+- Action: logs file edits to `activity.log`, checks if modified files relate to known KB entries
+
+### SessionStart: Brain Context Injection
+- Hook script: `~/.claude/brainless/hooks/session_start.py`
+- Triggered: on every new session
+- Action: loads brain stats, project-aware entry search, resets error streak
+
+### UserPromptSubmit: Proactive Brain Search
+- Hook script: `~/.claude/brainless/hooks/user_prompt_search.py`
+- Triggered: when user sends a message, BEFORE Claude starts processing
+- Action: extracts keywords from user prompt → searches `_cache.json` → injects matching entries
+- This means Claude starts working with relevant brain knowledge already loaded
+
+### PostCompact: Memory Restoration
+- Hook script: `~/.claude/brainless/hooks/post_compact.py`
+- Triggered: after context compression
+- Action: re-injects project entries, current streak state, unrecorded error count, and behavioral rules
+- This is the most critical recovery hook — when Claude's context gets compressed, it loses memory. This hook restores awareness.
+
+### CwdChanged: Project Context Reload
+- Hook script: `~/.claude/brainless/hooks/cwd_changed.py`
+- Triggered: when working directory changes
+- Action: searches brain by new cwd/repo name, shows known issues for new project
+
+### SubagentStop: Subagent Result Scanning
+- Hook script: `~/.claude/brainless/hooks/subagent_stop.py`
+- Triggered: when a subagent finishes
+- Action: scans subagent result for error keywords → searches brain for matching solutions
+
+### StopFailure: API Failure Tracking
+- Hook script: `~/.claude/brainless/hooks/stop_failure.py`
+- Triggered: when Claude's turn ends due to API error (rate limit, auth, billing)
+- Action: records failure to session errors log for tracking
+
+### Stop: Session Summary
+- Hook script: `~/.claude/brainless/hooks/session_end.py`
+- Triggered: on session end
+- Action: logs session duration, tool count, brain hits, warns about unrecorded errors
+
+### Trash Talk Module
+- Module: `~/.claude/brainless/hooks/trash_talk.py`
+- Shared by all hooks — provides random witty one-liners (毒舌吐槽风) for each event type
+- 13 phrase pools: session_start, session_end, user_prompt, error, error_no_match, error_matched, success, streak_warning, streak_critical, compact, cwd_changed, subagent_stop, stop_failure
+
+**This means:** even if CLAUDE.md instructions are lost due to context compression, the hooks will still fire and surface relevant knowledge from the brain. Claude literally cannot escape brainless awareness.
 
 ---
 

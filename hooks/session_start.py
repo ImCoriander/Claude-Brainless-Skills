@@ -19,11 +19,18 @@ import sys
 from datetime import datetime
 
 BRAINLESS_DIR = os.path.join(os.path.expanduser("~"), ".claude", "brainless")
+sys.path.insert(0, os.path.join(BRAINLESS_DIR, "hooks"))
+try:
+    from trash_talk import get_line
+except ImportError:
+    def get_line(cat, **kw):
+        return ""
 CACHE_FILE = os.path.join(BRAINLESS_DIR, "_cache.json")
 HOOKS_DIR = os.path.join(BRAINLESS_DIR, "hooks")
 SESSION_LOG = os.path.join(HOOKS_DIR, "session.log")
 ACTIVITY_LOG = os.path.join(HOOKS_DIR, "activity.log")
 SESSION_ERRORS_FILE = os.path.join(HOOKS_DIR, "_session_errors.json")
+STREAK_FILE = os.path.join(HOOKS_DIR, "_error_streak.json")
 
 
 def get_git_info():
@@ -117,6 +124,12 @@ def main():
             os.remove(SESSION_ERRORS_FILE)
     except Exception:
         pass
+    # Reset error streak for new session
+    try:
+        with open(STREAK_FILE, "w", encoding="utf-8") as f:
+            json.dump({"count": 0, "errors": [], "last_reset": timestamp}, f)
+    except Exception:
+        pass
 
     # Log session start
     try:
@@ -148,13 +161,16 @@ def main():
         pass
 
     # Output context for Claude
+    talk = get_line("session_start")
     if total == 0:
+        print(f"[BRAINLESS] {talk}")
         print("[BRAINLESS] Brain loaded: empty. Start recording with /brain-dump!")
         return
 
     # Stats summary
     top_cats = sorted(categories.items(), key=lambda x: -x[1])[:5]
     cat_str = ", ".join(f"{cat}({n})" for cat, n in top_cats)
+    print(f"[BRAINLESS] {talk}")
     print(f"[BRAINLESS] Brain loaded: {total} entries | Top: {cat_str}")
 
     # Project-aware search: find entries related to current working directory

@@ -2,6 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/ImCoriander/Claude-Brainless-Skills/stargazers"><img src="https://img.shields.io/github/stars/ImCoriander/Claude-Brainless-Skills?style=social" alt="GitHub Stars"></a>
+  <a href="https://github.com/ImCoriander/Claude-Brainless-Skills/releases"><img src="https://img.shields.io/github/downloads/ImCoriander/Claude-Brainless-Skills/total" alt="Downloads"></a>
   <a href="https://github.com/ImCoriander/Claude-Brainless-Skills/blob/main/LICENSE"><img src="https://img.shields.io/github/license/ImCoriander/Claude-Brainless-Skills" alt="License"></a>
   <a href="https://github.com/ImCoriander/Claude-Brainless-Skills/issues"><img src="https://img.shields.io/github/issues/ImCoriander/Claude-Brainless-Skills" alt="Issues"></a>
 </p>
@@ -46,29 +47,49 @@ Every developer has experienced this:
 
 ### Lifecycle Hooks — True Automation
 
-Brainless installs **4 hooks** covering the entire Claude Code session lifecycle. These are real automations in `settings.json` — **no prompt instructions needed, works even if context is compressed.**
+Brainless installs **10 hooks** across **10 Claude Code events**, covering the entire session lifecycle. These are real automations in `settings.json` — **no prompt instructions needed, works even if context is compressed.** All hooks include witty trash-talk one-liners (毒舌吐槽风).
 
 | Hook Event | Script | What It Does |
 |-----------|--------|-------------|
-| **SessionStart** | `session_start.py` | Injects brain context at session start — total entries, project-specific known issues (matched by cwd/repo), recent entries |
-| **PostToolUse** (Bash) | `bash_error_search.py` | Auto-searches knowledge base when any command fails (non-zero exit code), tracks unmatched errors |
-| **PostToolUse** (Edit\|Write) | `post_tool_logger.py` | Logs file edits and checks if modified files relate to known KB entries |
-| **Stop** | `session_end.py` | Logs session summary (duration, tool count, brain hits) and **alerts about unrecorded errors** that need `/brain-dump` |
+| **UserPromptSubmit** | `user_prompt_search.py` | **Proactive brain search** — when user sends a message, extracts keywords and searches brain BEFORE Claude starts working |
+| **PreToolUse** (All tools) | `streak_reminder.py` | **Consecutive error escalation** — if 2+ errors in a row, injects WARNING; at 4+, CRITICAL alert forcing approach change |
+| **SessionStart** | `session_start.py` | Injects brain context — total entries, project-specific known issues, recent entries, resets error streak |
+| **PostToolUse** (All tools) | `universal_error_search.py` | **Universal error detection + streak tracking** — searches KB on errors, tracks streak, resets on action tool success |
+| **PostToolUseFailure** (All tools) | `universal_error_search.py` | **Failure detection** — catches tool failures, writes to pending file for next PostToolUse to output |
+| **PostToolUse** (Edit\|Write) | `post_tool_logger.py` | Logs file edits, checks if modified files relate to known KB entries |
+| **PostCompact** | `post_compact.py` | **Memory restoration** — after context compression, re-injects project entries, streak state, unrecorded errors, and behavioral rules |
+| **CwdChanged** | `cwd_changed.py` | **Project context reload** — when switching directories, searches brain for new project's known issues |
+| **SubagentStop** | `subagent_stop.py` | **Subagent result scan** — when a subagent finishes, scans result for errors and searches brain |
+| **StopFailure** | `stop_failure.py` | **API failure tracking** — records rate limits, auth failures, billing errors to session log |
+| **Stop** | `session_end.py` | Session summary (duration, tool count, brain hits) + **alerts about unrecorded errors** |
 
 ```
-SessionStart                   PostToolUse(Bash)               Stop
-    |                                |                            |
-    v                                v                            v
- Load _cache.json             Error? Search _cache.json     Read _session_errors.json
- Search by cwd/repo            |-- Match → show solution     |-- Unrecorded errors → remind /brain-dump
- Show project-specific issues  |-- No match → track error    |-- Log duration/tools/hits
- Reset session tracking        v                              Clean up temp files
-                          PostToolUse(Edit|Write)
-                               |
-                               v
-                          Log activity
-                          Match file → KB entries
+UserPromptSubmit    PreToolUse(ALL)    SessionStart       PostToolUse(ALL)         PostToolUseFailure
+     |                   |                 |                    |                        |
+     v                   v                 v                    v                        v
+ Extract keywords   Read streak        Load cache         1. Flush pending          Write to pending
+ Search _cache      count < 2? skip    Search by cwd      2. Error in stdout?       (stdout not visible)
+ Inject matches     count >= 2? WARN   Show known issues      |-- Yes → search       streak++
+ + trash talk       count >= 4? CRIT   Reset streak           |-- No  → reset streak
+                    + trash talk       + trash talk            + trash talk
+
+PostCompact         CwdChanged         SubagentStop        StopFailure              Stop
+     |                   |                  |                   |                      |
+     v                   v                  v                   v                      v
+ Re-inject brain    Search by new cwd  Scan result for     Track to session       Read _session_errors
+ Project entries    Show known issues  errors → search     _errors.json           Unrecorded → warn
+ Streak state       + trash talk       brain for matches   + trash talk           Log session summary
+ Rules reminder                        + trash talk                               + trash talk
+ + trash talk
 ```
+
+> **v5 upgrade:** Added 5 new hooks (UserPromptSubmit, PostCompact, CwdChanged, SubagentStop, StopFailure) + trash talk system with witty one-liners. UserPromptSubmit pre-searches brain when user types. PostCompact restores brain memory after context compression. Total: 10 events hooked.
+>
+> **v4 upgrade:** Added `PreToolUse` hook for consecutive error streak tracking. Separated tools into ACTION (Bash/Edit/Write) vs INVESTIGATION (Read/Grep/Glob) — only action tools trigger error detection and streak reset.
+>
+> **v3 upgrade:** Pending file mechanism for PostToolUseFailure (stdout not visible to Claude).
+>
+> **v2 upgrade:** Universal error search replacing old Bash-only hook.
 
 ### Auto-Record — Zero Manual Effort
 
@@ -191,40 +212,40 @@ Every time a past solution is recalled, the entry's `hit_count` increments and `
 ## How It Works
 
 ```
-  Session starts                     Error occurs                     Session ends
-       |                                  |                                |
-       v                                  v                                v
- [SessionStart Hook]              [PostToolUse Hook]               [Stop Hook]
- Load brain context               Search _cache.json               Check unrecorded errors
- Show project known issues         /        \                      Remind: /brain-dump
-       |                         Yes         No                    Log session summary
-       v                          |           |
- Claude starts with              Apply fix    Debug → Solved?
- full brain awareness                         → Auto-Record
-                                              → Track for session end
+  Session starts          BEFORE any tool call       AFTER any tool call          Session ends
+       |                         |                         |                          |
+       v                         v                         v                          v
+ [SessionStart Hook]      [PreToolUse Hook]         [PostToolUse Hook]          [Stop Hook]
+ Load brain context       Check error streak        Error detected?             Check unrecorded errors
+ Show known issues        streak < 2? → silent       /        \                 Remind: /brain-dump
+ Reset streak             streak >= 2? → WARN      Yes         No               Log session summary
+       |                  streak >= 4? → CRIT        |           |
+       v                  "SEARCH THE BRAIN"       Search KB   Reset streak
+ Claude starts with                                streak++
+ full brain awareness                               |
+                                                  Match?
+                                                 /      \
+                                               Yes      No
+                                                |        |
+                                           Apply fix   Track + DIRECTIVE:
+                                                       → /brain-dump after resolving
 ```
 
 ---
 
 ## Install
 
-**Linux / macOS / Git Bash:**
+**All platforms (Linux / macOS / Windows):**
 ```bash
 git clone https://github.com/ImCoriander/Claude-Brainless-Skills.git
 cd Claude-Brainless-Skills
-bash install.sh
+python install.py
 ```
 
-**Windows (CMD / PowerShell):**
-```cmd
-git clone https://github.com/ImCoriander/Claude-Brainless-Skills.git
-cd Claude-Brainless-Skills
-install.bat
-```
 
 **Requirements:**
 - Claude Code installed (`~/.claude/` directory exists)
-- Python 3 (for auto-search hook)
+- Python 3 (for installer and auto-search hooks)
 
 **What gets installed:**
 
@@ -244,10 +265,17 @@ install.bat
     ├── INDEX.md                 # Master index
     ├── _cache.json              # Fast search cache
     ├── hooks/
-    │   ├── session_start.py     # SessionStart hook — context injection
-    │   ├── bash_error_search.py # PostToolUse(Bash) — error auto-search
-    │   ├── post_tool_logger.py  # PostToolUse(Edit|Write) — activity log
-    │   └── session_end.py       # Stop hook — session summary + alerts
+    │   ├── trash_talk.py               # Shared module — witty one-liners for all hooks
+    │   ├── user_prompt_search.py       # UserPromptSubmit — proactive brain search
+    │   ├── streak_reminder.py          # PreToolUse(ALL) — consecutive error escalation
+    │   ├── session_start.py            # SessionStart — context injection + streak reset
+    │   ├── universal_error_search.py   # PostToolUse + PostToolUseFailure(ALL) — error search + streak
+    │   ├── post_tool_logger.py         # PostToolUse(Edit|Write) — activity log
+    │   ├── post_compact.py             # PostCompact — re-inject brain after compression
+    │   ├── cwd_changed.py              # CwdChanged — reload brain for new project
+    │   ├── subagent_stop.py            # SubagentStop — scan subagent results
+    │   ├── stop_failure.py             # StopFailure — track API errors
+    │   └── session_end.py              # Stop — session summary + alerts
     └── <13 category dirs>/      # Category sub-indexes + entries
 ```
 
@@ -259,7 +287,7 @@ If you already have a `CLAUDE.md`, the installer **appends** the brainless secti
 
 ### Why does it modify settings.json?
 
-The installer registers **4 lifecycle hooks** (SessionStart, PostToolUse for Bash, PostToolUse for Edit/Write, and Stop). These hooks run Python scripts that provide true automation independent of prompt instructions — context injection at session start, error auto-search on failures, activity logging on file edits, and session summary with unrecorded error alerts at session end. The installer safely merges hooks into your existing settings without overwriting anything.
+The installer registers **10 hooks** across 10 Claude Code events (UserPromptSubmit, PreToolUse, SessionStart, PostToolUse, PostToolUseFailure, PostCompact, CwdChanged, SubagentStop, StopFailure, Stop). These hooks provide true automation independent of prompt instructions — proactive brain search on user input, error streak escalation, context injection, universal error detection, memory restoration after compaction, project-aware context reloading, subagent result scanning, API failure tracking, and session summaries. The installer safely merges hooks into your existing settings without overwriting anything.
 
 ---
 
@@ -271,14 +299,11 @@ Re-running `install.sh` updates the skill, commands, and hook while **preserving
 
 ## Uninstall
 
-**Quick:**
+**Quick (all platforms):**
 ```bash
-# Linux / macOS / Git Bash
-bash uninstall.sh
-
-# Windows (CMD / PowerShell)
-uninstall.bat
+python uninstall.py
 ```
+
 
 **Manual — Important: Remove hooks from settings.json FIRST, before deleting files.** Otherwise hooks will fire and produce blocking errors because the scripts no longer exist.
 
@@ -286,10 +311,10 @@ uninstall.bat
 # Step 1: Remove all brainless hooks from settings.json
 python3 -c "
 import json
-MARKERS = ['bash_error_search', 'session_start', 'post_tool_logger', 'session_end']
+MARKERS = ['bash_error_search', 'universal_error_search', 'session_start', 'post_tool_logger', 'session_end', 'streak_reminder', 'user_prompt_search', 'post_compact', 'cwd_changed', 'subagent_stop', 'stop_failure']
 f = open('$HOME/.claude/settings.json', 'r'); s = json.load(f); f.close()
 hooks = s.get('hooks', {})
-for event in ['SessionStart', 'PostToolUse', 'Stop']:
+for event in ['PreToolUse', 'UserPromptSubmit', 'SessionStart', 'PostToolUse', 'PostToolUseFailure', 'PostCompact', 'CwdChanged', 'SubagentStop', 'StopFailure', 'Stop']:
     entries = hooks.get(event, [])
     hooks[event] = [h for h in entries if not any(m in hk.get('command', '') for hk in h.get('hooks', []) for m in MARKERS)]
     if not hooks[event]: del hooks[event]
@@ -300,7 +325,7 @@ f = open('$HOME/.claude/settings.json', 'w'); json.dump(s, f, indent=2, ensure_a
 python3 -c "
 import re
 f = open('$HOME/.claude/CLAUDE.md', 'r'); c = f.read(); f.close()
-c = re.sub(r'\n*## Brainless Auto-Behaviors \(MANDATORY\).*?(?=\n## (?!Brainless)|$)', '', c, flags=re.DOTALL).strip()
+c = re.sub(r'\n*## Brainless Auto-Behaviors \(MANDATORY[^)]*\).*?(?=\n## (?!Brainless)|$)', '', c, flags=re.DOTALL).strip()
 f = open('$HOME/.claude/CLAUDE.md', 'w'); f.write(c + '\n'); f.close()
 "
 

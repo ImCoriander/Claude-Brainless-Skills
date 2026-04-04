@@ -1,2 +1,4 @@
 .claude/
 wechat_article.md
+__pycache__/
+*.pyc
